@@ -87,7 +87,12 @@ namespace csgo_hitbox_volumes
                 Console.WriteLine();
             }
             Console.WriteLine();
-
+            Console.Write("{0,24} ","");
+            foreach (Hitbox hitbox in models[0].Hitboxes)
+            {
+                Console.Write("{0,10} ", hitbox.Name.Replace("ValveBiped,Bip01_", ""));
+            }
+            Console.WriteLine();
             ShowResult(FormulaType.Volume, "V");
             ShowResult(FormulaType.Surface, "S");
             ShowResult(FormulaType.Surface2D, "S(2D)");

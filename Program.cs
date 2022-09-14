@@ -1,11 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace csgo_hitbox_volumes
 {
+    public enum FormulaType
+    {
+        Volume,
+        Surface,
+        Surface2D,
+    }
     class Program
     {
+        public static Dictionary<string, List<Hitbox>> hitboxGroup;
         static void Main(string[] args)
         {
             if (args.Length == 0)
@@ -14,8 +22,10 @@ namespace csgo_hitbox_volumes
                 return;
             }
             List<Model> models = new List<Model>();
+            hitboxGroup = new Dictionary<string, List<Hitbox>>();
+            string path = args[0];
 
-            string[] folders = Directory.GetDirectories(args[0]);
+            string[] folders = Directory.GetDirectories(path);
             foreach (string folder in folders)
             {
                 string[] files = Directory.GetFiles(folder, "*.qc");
@@ -27,22 +37,20 @@ namespace csgo_hitbox_volumes
                 {
                     if (line.IndexOf("$hbox ") >= 0)
                     {
-                        model.Hitboxes.Add(new Hitbox(line));
+                        Hitbox hitbox = new Hitbox(line);
+                        model.Hitboxes.Add(hitbox);
+                        if(!hitboxGroup.ContainsKey(hitbox.Name))
+                            hitboxGroup.Add(hitbox.Name, new List<Hitbox>());
+                        hitboxGroup[hitbox.Name].Add(hitbox);
                     }
                 }
                 if (model.Hitboxes.Count > 0)
                     models.Add(model);
             }
             Console.Write("{0,26}", "Model name");
-            List<float> hitboxMax = new List<float>();
-            List<float> hitboxMin = new List<float>();
 
-            int maxOffset = 0;
             foreach (Hitbox hitbox in models[0].Hitboxes)
             {
-                maxOffset = Math.Max(maxOffset, hitbox.Name.Length);
-                hitboxMax.Add(hitbox.Volume);
-                hitboxMin.Add(hitbox.Volume);
                 Console.Write("{0,10} ", hitbox.Name.Replace("ValveBiped,Bip01_", ""));
             }
 
@@ -74,34 +82,105 @@ namespace csgo_hitbox_volumes
                         continue;
                     }
                     if (hitboxNeeded == null) break;
-                    hitboxMax[i] = Math.Max(hitboxMax[i], hitboxNeeded.Volume);
-                    hitboxMin[i] = Math.Min(hitboxMin[i], hitboxNeeded.Volume);
                     Console.Write("{0,10:0.00000} ", hitboxNeeded.Volume);
                 }
                 Console.WriteLine();
             }
             Console.WriteLine();
-            Console.Write("{0,26}", "Hitbox Max V ");
-            foreach (float max in hitboxMax) Console.Write("{0,10:0.00000} ", max);
+
+            ShowResult(FormulaType.Volume, "V");
+            ShowResult(FormulaType.Surface, "S");
+            ShowResult(FormulaType.Surface2D, "S(2D)");
+            Console.ReadKey();
+        }
+
+        public static void ShowResult(FormulaType type,string text="")
+        {
+            Console.Write("{0,26}", $"Hitbox Max {text} ");
+
+            
+            foreach (KeyValuePair<string, List<Hitbox>> hboxGroup in hitboxGroup)
+            {
+                float value = 0;
+                switch (type)
+                {
+                    case FormulaType.Volume:
+                        hboxGroup.Value.Sort(new ComparerVolume());
+                        value = hboxGroup.Value[0].Volume;
+                        break;
+                    case FormulaType.Surface:
+                        hboxGroup.Value.Sort(new ComparerSurface());
+                        value = hboxGroup.Value[0].Surface;
+                        break;                    
+                    case FormulaType.Surface2D:
+                        hboxGroup.Value.Sort(new ComparerSurface2D());
+                        value = hboxGroup.Value[0].Surface2D;
+                        break;
+                }
+                Console.Write("{0,10:0.00000} ", value);
+            }
             Console.WriteLine();
 
-            Console.Write("{0,26}", "Hitbox Min V ");
-            foreach (float min in hitboxMin) Console.Write("{0,10:0.00000} ", min);
+            Console.Write("{0,26}", $"Hitbox Min {text} ");
+            foreach (KeyValuePair<string, List<Hitbox>> hboxGroup in hitboxGroup)
+            {
+                float value = 0;
+                switch (type)
+                {
+                    case FormulaType.Volume:
+                        value = hboxGroup.Value[hboxGroup.Value.Count-1].Volume;
+                        break;
+                    case FormulaType.Surface:
+                        value = hboxGroup.Value[hboxGroup.Value.Count - 1].Surface;
+                        break;
+                    case FormulaType.Surface2D:
+                        value = hboxGroup.Value[hboxGroup.Value.Count - 1].Surface2D;
+                        break;
+                }
+                Console.Write("{0,10:0.00000} ", value);
+            }
             Console.WriteLine();
 
             Console.Write("{0,26}", "Difference");
-            for (int i = 0; i < hitboxMax.Count; i++)
+            foreach (KeyValuePair<string, List<Hitbox>> hboxGroup in hitboxGroup)
             {
-                Console.Write("{0,10:0.00000} ", hitboxMax[i] - hitboxMin[i]);
+                float value = 0;
+                switch (type)
+                {
+                    case FormulaType.Volume:
+                        value = hboxGroup.Value[0].Volume- hboxGroup.Value[hboxGroup.Value.Count - 1].Volume;
+                        break;
+                    case FormulaType.Surface:
+                        value = hboxGroup.Value[0].Surface - hboxGroup.Value[hboxGroup.Value.Count - 1].Surface;
+                        break;
+                    case FormulaType.Surface2D:
+                        value = hboxGroup.Value[0].Surface2D - hboxGroup.Value[hboxGroup.Value.Count - 1].Surface2D;
+                        break;
+                }
+                Console.Write("{0,10:0.00000} ", value);
             }
             Console.WriteLine();
 
             Console.Write("{0,26}", "Percent %");
-            for (int i = 0; i < hitboxMax.Count; i++)
+            foreach (KeyValuePair<string, List<Hitbox>> hboxGroup in hitboxGroup)
             {
-                Console.Write("{0,10:0.00000} ", (1.0f - (hitboxMin[i] / hitboxMax[i])) * 100.0f);
+                float value = 0;
+                switch (type)
+                {
+                    case FormulaType.Volume:
+                        value = (1.0f-hboxGroup.Value[hboxGroup.Value.Count - 1].Volume/hboxGroup.Value[0].Volume) *100.0f;
+                        break;
+                    case FormulaType.Surface:
+                        value = (1.0f - hboxGroup.Value[hboxGroup.Value.Count - 1].Surface / hboxGroup.Value[0].Surface) * 100.0f;
+                        break;
+                    case FormulaType.Surface2D:
+                        value = (1.0f - hboxGroup.Value[hboxGroup.Value.Count - 1].Surface2D / hboxGroup.Value[0].Surface2D) * 100.0f;
+                        break;
+                }
+                Console.Write("{0,10:0.00000} ", value);
             }
-            Console.ReadKey();
+            Console.WriteLine();
+            Console.WriteLine();
         }
     }
 }

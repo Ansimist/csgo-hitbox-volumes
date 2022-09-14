@@ -1,6 +1,6 @@
 # csgo-hitbox-volumes
  
-![Image alt](https://i.imgur.com/CkYu74j.png)
+![Image alt](https://imgur.com/eglBLuU.png)
 
 This program calculates hitbox volumes based on qc files.
 To use it, just drop the folder with qc files to the program located in “..\bin\release\”
